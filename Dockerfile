@@ -7,4 +7,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD [ "python", "./src/web-monitor/web_monitor.py"]
+CMD [ "python", "./run_script.py"]

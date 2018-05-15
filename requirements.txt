@@ -1,4 +1,4 @@
-pytest
-flask
-requests
+pytest == 3.5.0
+flask == 0.12.2
+requests == 2.18.4
 aiohttp == 3.2.0

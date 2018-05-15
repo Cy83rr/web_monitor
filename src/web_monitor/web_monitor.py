@@ -2,43 +2,34 @@
 Creates the logger, processes and threads, initializes everything
 """
 import asyncio
+import logging
 import time
 from contextlib import suppress
 from multiprocessing import Process
-from threading import Thread
 
 import aiohttp
 
-#from src.web_monitor.server.server import WebMonitorServer
-# TODO: do this for unlimited time, then scale to a list of urls
 from src.web_monitor.server import server
 
 
 async def do_request(url, period_ms, content):
+    log = logging.getLogger(__name__)
     p = Periodic(url, period_ms, content)
     try:
-        print('Start')
+        log.debug('Start')
         await p.start()
-        await asyncio.sleep(3.1) # it repeats the task as many times it can in the sleep
+        await asyncio.sleep(3.1)  # it repeats the task as many times it can in the sleep
 
-        print('Stop')
+        log.debug('Stop')
         await p.stop()
         await asyncio.sleep(3.1)
 
-        print('Start')
+        log.debug('Start')
         await p.start()
         await asyncio.sleep(3.1)
     finally:
         await p.stop()  # we should stop task finally
 
-
-    # start_time = time.time()
-    # response = await aiohttp.request('GET', url)
-    # end_time = time.time()
-    # print(response)
-    # #result = check_response(response)
-    #
-    # return end_time - start_time
 
 class Periodic:
     def __init__(self, url, time, content):
@@ -64,44 +55,46 @@ class Periodic:
 
     async def _run(self):
         async with aiohttp.ClientSession() as session:
+            log = logging.getLogger(__name__)
             while True:
-                await asyncio.sleep(self.time/1000)
+                await asyncio.sleep(self.time / 1000)
                 start_time = time.time()
                 response = await fetch(session, self.url)
                 end_time = time.time()
-                print(self.url)
-                print('Content OK?', self.content in response)
-                print(end_time - start_time)
+                log.info('%s\t%s\t%s', self.url, self.content in response, end_time - start_time)
+
 
 async def fetch(session, url):
     async with session.get(url) as response:
         return await response.text()
 
-def start_app(config):
-    # server = WebMonitorServer()
-    # server.run_server()
 
-    period_ms = 100
+def start_app(config):
+    log = logging.getLogger(__name__)
+    log.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    log_path = config['general']['log_path']
+    fh = logging.FileHandler(log_path, 'w')
+    fh.setLevel(config['general']['file_log_level'])
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    ch.setFormatter(formatter)
+    fh.setFormatter(formatter)
+
+    log.addHandler(ch)
+    log.addHandler(fh)
+    period_ms = int(config['general']['checking_period'])
     web_dict = config['url_content']
 
-
-    #task = asyncio.Task(do_request(url))
     loop = asyncio.get_event_loop()
     for url, content in web_dict.items():
-        print('Key: ', url)
-        #loop.run_until_complete(do_request(url, period_ms, web_dict[url]))
+        log.debug('Key: %s', url)
         loop.create_task(do_request(url, period_ms, web_dict[url]))
     loop.run_forever()
 
-    #loop.create_task(do_request(url))
-    #loop.call_later(period_ms, lambda: asyncio.Task.cancel) # not sure this works correctly - might be better to create tasks explicitly
-    # loop.call_later(period_ms, task.cancel)
-    # try:
-    #     loop.run_until_complete(task)
-    # except asyncio.CancelledError:
-    #     pass
-def main(config):
 
+def main(config):
     processes = []
     p = Process(target=server.create_app)
     p.start()
