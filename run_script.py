@@ -7,7 +7,6 @@ from src.web_monitor import web_monitor
 def read_config():
     config = configparser.ConfigParser()
     config.read('config.ini')
-    #config.add_section('url_content')
     with open("websites.txt", "r") as web_config:
         tsv_reader = csv.DictReader(web_config, delimiter='\t')
         web_dict = {}
