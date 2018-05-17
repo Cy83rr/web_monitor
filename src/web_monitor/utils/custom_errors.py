@@ -11,4 +11,4 @@ class ConnectionProblem(Exception):
     def __init__(self, url, error_msg):
         super(ConnectionProblem, self).__init__()
         self.url = url
-        self.error_msg = error_msg
+        self.error_msg = str(error_msg)
