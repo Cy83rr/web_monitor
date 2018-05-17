@@ -7,21 +7,46 @@ import time
 from multiprocessing import Process
 
 import aiohttp
+import async_timeout
 
 from src.web_monitor.server import server
+from src.web_monitor.utils.custom_errors import ConnectionProblem
+
+WAIT_TIMEOUT = 1  # in seconds
+
+
+async def fetch(session, url, content):
+    log = logging.getLogger(__name__)
+    try:
+        # with async_timeout.timeout(WAIT_TIMEOUT):
+        #     start_time = time.time()
+        #     async with session.get(url) as response:
+        #         text = await response.text()
+        #     end_time = time.time()
+        start_time = time.time()
+        async with session.get(url) as response:
+            text = await response.text()
+        end_time = time.time()
+    except Exception as e:
+        raise ConnectionProblem(url, e)
+    log.info('%s\t%s\t%s', url, content in text, end_time - start_time)
 
 
 async def do_request(url, period_ms, content):
-    #asyncio.ensure_future
     async with aiohttp.ClientSession() as session:
         log = logging.getLogger(__name__)
         while True:
             await asyncio.sleep(period_ms / 1000)
-            start_time = time.time()
-            response = await session.get(url)
-            text = await response.text()
-            end_time = time.time()
-            log.info('%s\t%s\t%s', url, content in text, end_time - start_time)
+            future = asyncio.ensure_future(fetch(session, url, content))
+
+            def callback(fut):
+                ex = fut.exception()
+                if type(ex) is ConnectionProblem:
+                    log.error('%s\tConnection problem\tSpecific error type: %s', ex.url, type(ex.error_msg))
+                elif ex:
+                    log.critical('UNKNOWN ERROR')
+
+            future.add_done_callback(callback)
 
 
 def start_app(config):
@@ -39,14 +64,17 @@ def start_app(config):
 
     log.addHandler(ch)
     log.addHandler(fh)
+
     period_ms = int(config['general']['checking_period'])
     web_dict = config['url_content']
 
     loop = asyncio.get_event_loop()
+    futures = []
     for url, content in web_dict.items():
         log.debug('Key: %s', url)
-        loop.create_task(do_request(url, period_ms, web_dict[url]))
-    loop.run_forever()
+        future = asyncio.ensure_future(do_request(url, period_ms, content))
+        futures.append(future)
+    loop.run_until_complete(asyncio.gather(*futures, return_exceptions=True))
 
 
 def main(config):
