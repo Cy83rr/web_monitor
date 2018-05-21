@@ -31,8 +31,8 @@ async def fetch(session, url, timeout_s, content):
         else:
             msg = str(ex)
         raise ConnectionProblem(url, msg)
-
-    log.info('%s\t%s\t%s', url, content in text, end_time - start_time)
+    content_ok = content in text
+    log.info('%s\t%s\t%s', url, content_ok, end_time - start_time)
 
 
 async def do_request(url, period_ms, timeout_s, content):
